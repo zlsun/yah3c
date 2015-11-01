@@ -11,13 +11,18 @@ import socket
 import os, sys, pwd
 from subprocess import call
 
-from .colorama import Fore, Style, init
 # init() # required in Windows
 from .eappacket import *
 
-def display_prompt(color, string):
-    prompt = color + Style.BRIGHT + '==> ' + Style.RESET_ALL
-    prompt += Style.BRIGHT + string + Style.RESET_ALL
+def display_prompt(msg_type, msg):
+    if msg_type is 'in':
+        prompt = '\x1b[92m' + '==> ' + '\x1b(B\x1b[m'
+    elif msg_type is 'out':
+        prompt = '\x1b[93m' + '==> ' + '\x1b(B\x1b[m'
+    elif msg_type is 'error':
+        prompt = '\x1b[31m' + '==> ' + '\x1b(B\x1b[m'
+
+    prompt += '\x1b[1m' + msg + '\x1b(B\x1b[m'
     print(prompt)
 
 def display_packet(packet):
@@ -44,7 +49,7 @@ class EAPAuth:
         eap_start_packet = self.ethernet_header + get_EAPOL(EAPOL_START)
         self.client.send(eap_start_packet)
 
-        display_prompt(Fore.GREEN, 'Sending EAPOL start')
+        display_prompt('out', 'Sending EAPOL start')
 
     def send_logoff(self):
         # sent eapol logoff packet
@@ -52,7 +57,7 @@ class EAPAuth:
         self.client.send(eap_logoff_packet)
         self.has_sent_logoff = True
 
-        display_prompt(Fore.GREEN, 'Sending EAPOL logoff')
+        display_prompt('out', 'Sending EAPOL logoff')
 
     def send_response_id(self, packet_id):
         self.client.send(self.ethernet_header +
@@ -100,15 +105,15 @@ class EAPAuth:
     def EAP_handler(self, eap_packet):
         vers, type, eapol_len  = unpack("!BBH",eap_packet[:4])
         if type != EAPOL_EAPPACKET:
-            display_prompt(Fore.YELLOW, 'Got unknown EAPOL type %i' % type)
+            display_prompt('in', 'Got unknown EAPOL type %i' % type)
 
         # EAPOL_EAPPACKET type
         code, id, eap_len = unpack("!BBH", eap_packet[4:8])
         if code == EAP_SUCCESS:
-            display_prompt(Fore.YELLOW, 'Got EAP Success')
+            display_prompt('in', 'Got EAP Success')
 
             if self.login_info['dhcp_command']:
-                display_prompt(Fore.YELLOW, 'Obtaining IP Address:')
+                display_prompt('in', 'Obtaining IP Address:')
                 call([self.login_info['dhcp_command'], self.login_info['ethernet_interface']])
 
             if self.login_info['daemon'] == 'True':
@@ -116,39 +121,39 @@ class EAPAuth:
 
         elif code == EAP_FAILURE:
             if (self.has_sent_logoff):
-                display_prompt(Fore.YELLOW, 'Logoff Successfully!')
+                display_prompt('in', 'Logoff Successfully!')
 
                 #self.display_login_message(eap_packet[10:])
             else:
-                display_prompt(Fore.YELLOW, 'Got EAP Failure')
+                display_prompt('in', 'Got EAP Failure')
 
                 #self.display_login_message(eap_packet[10:])
             exit(-1)
         elif code == EAP_RESPONSE:
-            display_prompt(Fore.YELLOW, 'Got Unknown EAP Response')
+            display_prompt('in', 'Got Unknown EAP Response')
         elif code == EAP_REQUEST:
             reqtype = unpack("!B", eap_packet[8:9])[0]
             reqdata = eap_packet[9:4 + eap_len]
             if reqtype == EAP_TYPE_ID:
-                display_prompt(Fore.YELLOW, 'Got EAP Request for identity')
+                display_prompt('in', 'Got EAP Request for identity')
                 self.send_response_id(id)
-                display_prompt(Fore.GREEN, 'Sending EAP response with identity = [%s]' % self.login_info['username'])
+                display_prompt('out', 'Sending EAP response with identity = [%s]' % self.login_info['username'])
             elif reqtype == EAP_TYPE_H3C:
-                display_prompt(Fore.YELLOW, 'Got EAP Request for Allocation')
+                display_prompt('in', 'Got EAP Request for Allocation')
                 self.send_response_h3c(id)
-                display_prompt(Fore.GREEN, 'Sending EAP response with password')
+                display_prompt('out', 'Sending EAP response with password')
             elif reqtype == EAP_TYPE_MD5:
                 data_len = unpack("!B", reqdata[0:1])[0]
                 md5data = reqdata[1:1 + data_len]
-                display_prompt(Fore.YELLOW, 'Got EAP Request for MD5-Challenge')
+                display_prompt('in', 'Got EAP Request for MD5-Challenge')
                 self.send_response_md5(id, md5data)
-                display_prompt(Fore.GREEN, 'Sending EAP response with password')
+                display_prompt('out', 'Sending EAP response with password')
             else:
-                display_prompt(Fore.YELLOW, 'Got unknown Request type (%i)' % reqtype)
+                display_prompt('in', 'Got unknown Request type (%i)' % reqtype)
         elif code==10 and id==5:
             self.display_login_message(eap_packet[12:])
         else:
-            display_prompt(Fore.YELLOW, 'Got unknown EAP code (%i)' % code)
+            display_prompt('in', 'Got unknown EAP code (%i)' % code)
 
     def serve_forever(self):
         try:
@@ -159,7 +164,7 @@ class EAPAuth:
                 # strip the ethernet_header and handle
                 self.EAP_handler(eap_packet[14:])
         except KeyboardInterrupt:
-            print(Fore.RED + Style.BRIGHT + 'Interrupted by user' + Style.RESET_ALL)
+            print('Interrupted by user')
             self.send_logoff()
         except socket.error as msg:
             print("Connection error: %s" %msg)
