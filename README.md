@@ -2,7 +2,7 @@ yah3c
 =====
 
 本项目修改自 [YaH3C](http://github.com/humiaozuzu/YaH3C).
-修改是为了便于打包成 Archlinux 的 AUR.
+修改是为了便于打包成 Archlinux 的 [AUR](https://aur.archlinux.org/packages/yah3c/).
 
 安装
 ------------
