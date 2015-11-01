@@ -32,26 +32,8 @@ daemon = True              # 验证成功后是否变成daemon进程，默认为
 使用
 -----------
 
-假定你的用户名为account.
-
-开机自启:
-```
-systemd enable yah3c@account.service
-```
-
-启动:
-```
-systemd start yah3c@account.service
-```
-
-停止:
-```
-systemd stop yah3c@account.service
-```
-
-重启:
-```
-systemd restart yah3c@account.service
+``` bash
+sudo yah3c -u account
 ```
 
 Thanks
