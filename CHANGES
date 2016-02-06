@@ -3,6 +3,14 @@ YaH3C Changelog
 
 Here is the full list of changes between each YaH3C release.
 
+Version 0.6
+-----------
+
+Released on November 1st 2015
+
+* port to Python 3
+* remove colorama module
+
 Version 0.5
 -----------
 
