@@ -31,6 +31,7 @@ def display_packet(packet):
     print('\tFrom: ' + repr(packet[0:6]))
     print('\tTo: ' + repr(packet[6:12]))
     print('\tType: ' + repr(packet[12:14]))
+    print('\tData: ' + repr(packet[14:]))
 
 class EAPAuth:
     def __init__(self, login_info):
@@ -127,7 +128,7 @@ class EAPAuth:
             else:
                 display_prompt('in', 'Got EAP Failure')
 
-                #self.display_login_message(eap_packet[10:])
+                # self.display_login_message(eap_packet[10:])
             exit(-1)
         elif code == EAP_RESPONSE:
             display_prompt('in', 'Got Unknown EAP Response')
