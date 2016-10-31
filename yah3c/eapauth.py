@@ -8,11 +8,15 @@ and parses received EAP packet
 __all__ = ["EAPAuth"]
 
 import socket
-import os, sys, pwd
+import os
+import sys
+import pwd
 from subprocess import call
+from hashlib import md5
 
 # init() # required in Windows
 from .eappacket import *
+
 
 def display_prompt(msg_type, msg):
     if msg_type is 'in':
@@ -25,6 +29,7 @@ def display_prompt(msg_type, msg):
     prompt += '\x1b[1m' + msg + '\x1b(B\x1b[m'
     print(prompt)
 
+
 def display_packet(packet):
     # print ethernet_header infomation
     print('Ethernet Header Info: ')
@@ -33,17 +38,21 @@ def display_packet(packet):
     print('\tType: ' + repr(packet[12:14]))
     print('\tData: ' + repr(packet[14:]))
 
+
 class EAPAuth:
+
     def __init__(self, login_info):
         # bind the h3c client to the EAP protocal
-        self.client = socket.socket(socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETHERTYPE_PAE))
+        self.client = socket.socket(
+            socket.AF_PACKET, socket.SOCK_RAW, socket.htons(ETHERTYPE_PAE))
         self.client.bind((login_info['ethernet_interface'], ETHERTYPE_PAE))
         # get local ethernet card address
         self.mac_addr = self.client.getsockname()[4]
-        self.ethernet_header = get_ethernet_header(self.mac_addr, PAE_GROUP_ADDR, ETHERTYPE_PAE)
+        self.ethernet_header = get_ethernet_header(
+            self.mac_addr, PAE_GROUP_ADDR, ETHERTYPE_PAE)
         self.has_sent_logoff = False
         self.login_info = login_info
-        self.version_info = '\x06\x07bjQ7SE8BZ3MqHhs3clMregcDY3Y=\x20\x20'
+        self.version_info = b'\x06\x07PmJeSU5UNyV8Tk42cwZ7LLjgIxI=\x20\x20'
 
     def send_start(self):
         # sent eapol start packet
@@ -60,37 +69,33 @@ class EAPAuth:
 
         display_prompt('out', 'Sending EAPOL logoff')
 
+    def send_response(self, packet_id, type, resp):
+        eap_packet = self.ethernet_header + get_EAPOL(EAPOL_EAPPACKET,
+                                                      get_EAP(EAP_RESPONSE, packet_id, type, resp))
+        try:
+            self.client.send(eap_packet)
+        except socket.error as msg:
+            print("Connection error!")
+            exit(-1)
+
     def send_response_id(self, packet_id):
-        self.client.send(self.ethernet_header +
-                get_EAPOL(EAPOL_EAPPACKET,
-                    get_EAP(EAP_RESPONSE,
-                        packet_id,
-                        EAP_TYPE_ID,
-                        self.version_info + self.login_info['username'])))
+        username = self.login_info['username'].encode('latin')
+        self.send_response(packet_id, EAP_TYPE_ID,
+                           self.version_info + username)
 
     def send_response_md5(self, packet_id, md5data):
-        md5 = self.login_info['password'][0:16]
-        if len(md5) < 16:
-            md5 = md5 + '\x00' * (16 - len (md5))
-        chap = []
-        for i in range(0, 16):
-            chap.append(chr(ord(md5[i]) ^ md5data[i]))
-        resp = chr(len(chap)) + ''.join(chap) + self.login_info['username']
-        eap_packet = self.ethernet_header + get_EAPOL(EAPOL_EAPPACKET, get_EAP(EAP_RESPONSE, packet_id, EAP_TYPE_MD5, resp))
-        try:
-            self.client.send(eap_packet)
-        except socket.error as msg:
-            print("Connection error!")
-            exit(-1)
+        password = self.login_info['password'][0:16].encode('latin')
+        username = self.login_info['username'].encode('latin')
+        data = bytes([packet_id]) + password + md5data
+        digest = md5(data).digest()
+        resp = bytes([len(digest)]) + digest + username
+        self.send_response(packet_id, EAP_TYPE_MD5, resp)
 
     def send_response_h3c(self, packet_id):
-        resp = chr(len(self.login_info['password'])) + self.login_info['password'] + self.login_info['username']
-        eap_packet = self.ethernet_header + get_EAPOL(EAPOL_EAPPACKET, get_EAP(EAP_RESPONSE, packet_id, EAP_TYPE_H3C, resp))
-        try:
-            self.client.send(eap_packet)
-        except socket.error as msg:
-            print("Connection error!")
-            exit(-1)
+        password = self.login_info['password'][0:16].encode('latin')
+        username = self.login_info['username'].encode('latin')
+        resp = bytes([len(password)]) + password + username
+        self.send_response(packet_id, EAP_TYPE_H3C, resp)
 
     def display_login_message(self, msg):
         """
@@ -104,7 +109,7 @@ class EAPAuth:
             print(msg)
 
     def EAP_handler(self, eap_packet):
-        vers, type, eapol_len  = unpack("!BBH",eap_packet[:4])
+        vers, type, eapol_len = unpack("!BBH", eap_packet[:4])
         if type != EAPOL_EAPPACKET:
             display_prompt('in', 'Got unknown EAPOL type %i' % type)
 
@@ -115,16 +120,17 @@ class EAPAuth:
 
             if self.login_info['dhcp_command']:
                 display_prompt('in', 'Obtaining IP Address:')
-                call([self.login_info['dhcp_command'], self.login_info['ethernet_interface']])
+                call([self.login_info['dhcp_command'],
+                      self.login_info['ethernet_interface']])
 
             if self.login_info['daemon'] == 'True':
-                daemonize('/dev/null','/tmp/daemon.log','/tmp/daemon.log')
+                daemonize('/dev/null', '/tmp/daemon.log', '/tmp/daemon.log')
 
         elif code == EAP_FAILURE:
             if (self.has_sent_logoff):
                 display_prompt('in', 'Logoff Successfully!')
 
-                #self.display_login_message(eap_packet[10:])
+                # self.display_login_message(eap_packet[10:])
             else:
                 display_prompt('in', 'Got EAP Failure')
 
@@ -138,7 +144,8 @@ class EAPAuth:
             if reqtype == EAP_TYPE_ID:
                 display_prompt('in', 'Got EAP Request for identity')
                 self.send_response_id(id)
-                display_prompt('out', 'Sending EAP response with identity = [%s]' % self.login_info['username'])
+                display_prompt(
+                    'out', 'Sending EAP response with identity = [%s]' % self.login_info['username'])
             elif reqtype == EAP_TYPE_H3C:
                 display_prompt('in', 'Got EAP Request for Allocation')
                 self.send_response_h3c(id)
@@ -151,7 +158,7 @@ class EAPAuth:
                 display_prompt('out', 'Sending EAP response with password')
             else:
                 display_prompt('in', 'Got unknown Request type (%i)' % reqtype)
-        elif code==10 and id==5:
+        elif code == 10 and id == 5:
             self.display_login_message(eap_packet[12:])
         else:
             display_prompt('in', 'Got unknown EAP code (%i)' % code)
@@ -168,11 +175,11 @@ class EAPAuth:
             print('Interrupted by user')
             self.send_logoff()
         except socket.error as msg:
-            print("Connection error: %s" %msg)
+            print("Connection error: %s" % msg)
             exit(-1)
 
-def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
 
+def daemonize(stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
     '''This forks the current process into a daemon. The stdin, stdout, and
     stderr arguments are file names that will be opened and be used to replace
     the standard file descriptors in sys.stdin, sys.stdout, and sys.stderr.
@@ -186,7 +193,7 @@ def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         if pid > 0:
             sys.exit(0)   # Exit first parent.
     except OSError as e:
-        sys.stderr.write ("fork #1 failed: (%d) %s\n" % (e.errno, e.strerror) )
+        sys.stderr.write("fork #1 failed: (%d) %s\n" % (e.errno, e.strerror))
         sys.exit(1)
 
     # Decouple from parent environment.
@@ -200,7 +207,7 @@ def daemonize (stdin='/dev/null', stdout='/dev/null', stderr='/dev/null'):
         if pid > 0:
             sys.exit(0)   # Exit second parent.
     except OSError as e:
-        sys.stderr.write ("fork #2 failed: (%d) %s\n" % (e.errno, e.strerror) )
+        sys.stderr.write("fork #2 failed: (%d) %s\n" % (e.errno, e.strerror))
         sys.exit(1)
 
     # Now I am a daemon!

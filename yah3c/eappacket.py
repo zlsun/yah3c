@@ -1,6 +1,6 @@
 from struct import *
 
-## Constants
+# Constants
 # Reference: http://tools.ietf.org/html/rfc3748
 ETHERTYPE_PAE = 0x888e
 PAE_GROUP_ADDR = b"\x01\x80\xc2\x00\x00\x03"
@@ -33,15 +33,19 @@ EAP_TYPE_ID = 1                # identity
 EAP_TYPE_MD5 = 4               # md5 Challenge
 EAP_TYPE_H3C = 7               # H3C eap packet(used for SYSU east campus)
 
-### Packet builders
-def get_EAPOL(type, payload=b""):
-    return pack("!BBH", EAPOL_VERSION, type, len(payload))+payload
+# Packet builders
 
-def get_EAP(code, id, type=0, data=""):
+
+def get_EAPOL(type, payload=b""):
+    return pack("!BBH", EAPOL_VERSION, type, len(payload)) + payload
+
+
+def get_EAP(code, id, type=0, data=b""):
     if code in [EAP_SUCCESS, EAP_FAILURE]:
         return pack("!BBH", code, id, 4)
     else:
-        return pack("!BBHB", code, id, 5+len(data), type)+data.encode('latin')
+        return pack("!BBHB", code, id, 5 + len(data), type) + data
+
 
 def get_ethernet_header(src, dst, type):
-    return dst+src+pack("!H",type)
+    return dst + src + pack("!H", type)
