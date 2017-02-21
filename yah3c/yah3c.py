@@ -56,12 +56,18 @@ def prompt_user_info():
     dhcp_cmd = input('Dhcp command(Press Enter to pass): ')
     if not dhcp_cmd:
         dhcp_cmd = ''
+
+    md5_challenge = input("MD5-Challenge('xor' or 'md5', 'xor' by default): ")
+    if not md5_challenge:
+        md5_challenge = 'xor'
+
     return {
         'username': username,
         'password': password,
         'ethernet_interface': dev,
         'daemon': daemon,
-        'dhcp_command': dhcp_cmd
+        'dhcp_command': dhcp_cmd,
+        'md5_challenge': md5_challenge
     }
 
 def enter_interactive_usermanager():
@@ -130,6 +136,10 @@ def main():
     um = usermgr.UserMgr()
     login_info = um.get_user_info(args['username'])
     logging.debug(login_info)
+    if 'md5_challenge' not in login_info:
+        login_info['md5_challenge'] = 'xor'
+        um.remove_user(login_info['username'])
+        um.add_user(login_info)
     start_yah3c(login_info)
 
 if __name__ == "__main__":

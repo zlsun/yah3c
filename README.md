@@ -35,6 +35,7 @@ password = 123456          # 密码
 ethernet_interface = eth0  # 使用的网卡，默认为eth0
 dhcp_command = dhcpcd      # 验证成功后使用的dhcp命令(dhcpcd/dhclient)，默认为空
 daemon = True              # 验证成功后是否变成daemon进程，默认为是
+md5_challenge = xor        # MD5-Challenge算法，xor或者md5，默认为xor
 ```
 
 ## 使用

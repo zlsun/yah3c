@@ -11,8 +11,8 @@ import socket
 import os
 import sys
 import pwd
-from subprocess import call
-from hashlib import md5
+import hashlib
+import subprocess
 
 # init() # required in Windows
 from .eappacket import *
@@ -86,8 +86,17 @@ class EAPAuth:
     def send_response_md5(self, packet_id, md5data):
         password = self.login_info['password'][0:16].encode('latin')
         username = self.login_info['username'].encode('latin')
-        data = bytes([packet_id]) + password + md5data
-        digest = md5(data).digest()
+        if self.login_info['md5_challenge'] == 'md5':
+            data = bytes([packet_id]) + password + md5data
+            digest = hashlib.md5(data).digest()
+        else:
+            data = password
+            if len(data) < 16:
+                data = data + b'\x00' * (16 - len(data))
+            digest = []
+            for i in range(0, 16):
+                digest.append(data[i] ^ md5data[i])
+            digest = bytes(digest)
         resp = bytes([len(digest)]) + digest + username
         self.send_response(packet_id, EAP_TYPE_MD5, resp)
 
@@ -120,7 +129,7 @@ class EAPAuth:
 
             if self.login_info['dhcp_command']:
                 display_prompt('in', 'Obtaining IP Address:')
-                call([self.login_info['dhcp_command'],
+                subprocess.call([self.login_info['dhcp_command'],
                       self.login_info['ethernet_interface']])
 
             if self.login_info['daemon'] == 'True':

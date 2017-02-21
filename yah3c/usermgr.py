@@ -16,6 +16,7 @@ class UserMgr:
         "ethernet_interface": "eth0",
         "dhcp_command": "dhcpcd",
         "daemon": "True",
+        "md5_challenge": "xor",
         # following has not implemented yet
         "carry_version_info": "True",
         "broadcast_logoff": "False",
@@ -70,4 +71,6 @@ class UserMgr:
                         user_info['dhcp_command'])
         self.config.set(user_info['username'], 'daemon',
                         user_info['daemon'])
+        self.config.set(user_info['username'], 'md5_challenge',
+                        user_info['md5_challenge'])
         self.save_and_reload()
