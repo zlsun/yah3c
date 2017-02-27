@@ -126,15 +126,14 @@ def main():
         logging.debug('Debugging mode enabled.')
         logging.debug(args)
 
-    # if no username specified then enter interactive mode
     if args['username'] is None:
+        # if no username specified then enter interactive mode
         login_info = enter_interactive_usermanager()
-        logging.debug(login_info)
-        start_yah3c(login_info)
+    else:
+        # if there is username, then get it's info
+        um = usermgr.UserMgr()
+        login_info = um.get_user_info(args['username'])
 
-    # if there is username, then get it's info
-    um = usermgr.UserMgr()
-    login_info = um.get_user_info(args['username'])
     logging.debug(login_info)
     if 'md5_challenge' not in login_info:
         login_info['md5_challenge'] = 'xor'
